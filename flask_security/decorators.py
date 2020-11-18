@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    flask_security.decorators
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
+    flask.ext.security.decorators
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     Flask-Security decorators module
 
@@ -12,14 +12,13 @@
 from collections import namedtuple
 from functools import wraps
 
-from flask import Response, _request_ctx_stack, abort, current_app, redirect, \
-    request, url_for
-from flask_login import current_user, login_required  # pragma: no flakes
-from flask_principal import Identity, Permission, RoleNeed, identity_changed
+from flask import current_app, Response, request, redirect, _request_ctx_stack
+from flask.ext.login import current_user, login_required  # pragma: no flakes
+from flask.ext.principal import RoleNeed, Permission, Identity, identity_changed
 from werkzeug.local import LocalProxy
-from werkzeug.routing import BuildError
 
 from . import utils
+
 
 # Convenient references
 _security = LocalProxy(lambda: current_app.extensions['security'])
@@ -29,8 +28,7 @@ _default_unauthorized_html = """
     <h1>Unauthorized</h1>
     <p>The server could not verify that you are authorized to access the URL
     requested. You either supplied the wrong credentials (e.g. a bad password),
-    or your browser doesn't understand how to supply the credentials required.
-    </p>
+    or your browser doesn't understand how to supply the credentials required.</p>
     """
 
 BasicAuth = namedtuple('BasicAuth', 'username, password')
@@ -43,29 +41,22 @@ def _get_unauthorized_response(text=None, headers=None):
 
 
 def _get_unauthorized_view():
-    view = utils.get_url(utils.config_value('UNAUTHORIZED_VIEW'))
-    if view:
-        if callable(view):
-            view = view()
-        else:
-            try:
-                view = url_for(view)
-            except BuildError:
-                view = None
-        utils.do_flash(*utils.get_message('UNAUTHORIZED'))
-        redirect_to = '/'
-        if (request.referrer and
-                not request.referrer.split('?')[0].endswith(request.path)):
-            redirect_to = request.referrer
-
-        return redirect(view or redirect_to)
-    abort(403)
+    cv = utils.get_url(utils.config_value('UNAUTHORIZED_VIEW'))
+    utils.do_flash(*utils.get_message('UNAUTHORIZED'))
+    return redirect(cv or request.referrer or '/')
 
 
 def _check_token():
-    user = _security.login_manager.request_callback(request)
+    header_key = _security.token_authentication_header
+    args_key = _security.token_authentication_key
+    header_token = request.headers.get(header_key, None)
+    token = request.args.get(args_key, header_token)
+    if request.get_json(silent=True):
+        token = request.json.get(args_key, token)
 
-    if user and user.is_authenticated:
+    user = _security.login_manager.token_callback(token)
+
+    if user and user.is_authenticated():
         app = current_app._get_current_object()
         _request_ctx_stack.top.user = user
         identity_changed.send(app, identity=Identity(user.id))
@@ -76,11 +67,9 @@ def _check_token():
 
 def _check_http_auth():
     auth = request.authorization or BasicAuth(username=None, password=None)
-    if not auth.username:
-        return False
-    user = _security.datastore.get_user(auth.username)
+    user = _security.datastore.find_user(email=auth.username)
 
-    if user and user.verify_and_update_password(auth.password):
+    if user and utils.verify_and_update_password(auth.password, user):
         _security.datastore.commit()
         app = current_app._get_current_object()
         _request_ctx_stack.top.user = user
@@ -92,6 +81,7 @@ def _check_http_auth():
 
 def http_auth_required(realm):
     """Decorator that protects endpoints using Basic HTTP authentication.
+    The username should be set to the user's email address.
 
     :param realm: optional realm name"""
 
@@ -100,13 +90,9 @@ def http_auth_required(realm):
         def wrapper(*args, **kwargs):
             if _check_http_auth():
                 return fn(*args, **kwargs)
-            if _security._unauthorized_callback:
-                return _security._unauthorized_callback()
-            else:
-                r = _security.default_http_auth_realm \
-                    if callable(realm) else realm
-                h = {'WWW-Authenticate': 'Basic realm="%s"' % r}
-                return _get_unauthorized_response(headers=h)
+            r = _security.default_http_auth_realm if callable(realm) else realm
+            h = {'WWW-Authenticate': 'Basic realm="%s"' % r}
+            return _get_unauthorized_response(headers=h)
         return wrapper
 
     if callable(realm):
@@ -126,10 +112,7 @@ def auth_token_required(fn):
     def decorated(*args, **kwargs):
         if _check_token():
             return fn(*args, **kwargs)
-        if _security._unauthorized_callback:
-            return _security._unauthorized_callback()
-        else:
-            return _get_unauthorized_response()
+        return _get_unauthorized_response()
     return decorated
 
 
@@ -148,25 +131,17 @@ def auth_required(*auth_methods):
     login_mechanisms = {
         'token': lambda: _check_token(),
         'basic': lambda: _check_http_auth(),
-        'session': lambda: current_user.is_authenticated
+        'session': lambda: current_user.is_authenticated()
     }
 
     def wrapper(fn):
         @wraps(fn)
         def decorated_view(*args, **kwargs):
-            h = {}
-            mechanisms = [(method, login_mechanisms.get(method))
-                          for method in auth_methods]
-            for method, mechanism in mechanisms:
+            mechanisms = [login_mechanisms.get(method) for method in auth_methods]
+            for mechanism in mechanisms:
                 if mechanism and mechanism():
                     return fn(*args, **kwargs)
-                elif method == 'basic':
-                    r = _security.default_http_auth_realm
-                    h['WWW-Authenticate'] = 'Basic realm="%s"' % r
-            if _security._unauthorized_callback:
-                return _security._unauthorized_callback()
-            else:
-                return _get_unauthorized_response(headers=h)
+            return _get_unauthorized_response()
         return decorated_view
     return wrapper
 
@@ -191,10 +166,7 @@ def roles_required(*roles):
             perms = [Permission(RoleNeed(role)) for role in roles]
             for perm in perms:
                 if not perm.can():
-                    if _security._unauthorized_callback:
-                        return _security._unauthorized_callback()
-                    else:
-                        return _get_unauthorized_view()
+                    return _get_unauthorized_view()
             return fn(*args, **kwargs)
         return decorated_view
     return wrapper
@@ -220,10 +192,7 @@ def roles_accepted(*roles):
             perm = Permission(*[RoleNeed(role) for role in roles])
             if perm.can():
                 return fn(*args, **kwargs)
-            if _security._unauthorized_callback:
-                return _security._unauthorized_callback()
-            else:
-                return _get_unauthorized_view()
+            return _get_unauthorized_view()
         return decorated_view
     return wrapper
 
@@ -231,7 +200,7 @@ def roles_accepted(*roles):
 def anonymous_user_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if current_user.is_authenticated:
+        if current_user.is_authenticated():
             return redirect(utils.get_url(_security.post_login_view))
         return f(*args, **kwargs)
     return wrapper

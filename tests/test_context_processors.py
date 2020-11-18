@@ -7,6 +7,7 @@
 """
 
 import pytest
+
 from utils import authenticate
 
 
@@ -79,8 +80,6 @@ def test_context_processors(client, app):
     @app.security.mail_context_processor
     def mail():
         return {'foo': 'bar'}
-
-    client.get('/logout')
 
     with app.mail.record_messages() as outbox:
         client.post('/reset', data=dict(email='matt@lp.com'))
