@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    flask_security.changeable
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
+    flask.ext.security.changeable
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     Flask-Security recoverable module
 
@@ -42,5 +42,4 @@ def change_user_password(user, password):
     user.password = encrypt_password(password)
     _datastore.put(user)
     send_password_changed_notice(user)
-    password_changed.send(app._get_current_object(),
-                          user=user._get_current_object())
+    password_changed.send(app._get_current_object(), user=user)

@@ -8,8 +8,6 @@
 
 import pytest
 
-from flask import Flask
-from flask_security.core import UserMixin
 from flask_security.signals import password_changed
 
 from utils import authenticate
@@ -22,8 +20,6 @@ def test_recoverable_flag(app, client, get_message):
 
     @password_changed.connect_via(app)
     def on_password_changed(app, user):
-        assert isinstance(app, Flask)
-        assert isinstance(user, UserMixin)
         recorded.append(user)
 
     authenticate(client)

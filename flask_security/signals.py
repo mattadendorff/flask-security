@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    flask_security.signals
-    ~~~~~~~~~~~~~~~~~~~~~~
+    flask.ext.security.signals
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     Flask-Security signals module
 

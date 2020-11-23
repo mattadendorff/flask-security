@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: Flask-Security
-Version: 1.7.5
+Version: 1.7.4
 Summary: Simple security for Flask apps
 Home-page: https://github.com/mattupstate/flask-security
 Author: Matt Wright

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    flask_security.recoverable
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+    flask.ext.security.recoverable
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     Flask-Security recoverable module
 
@@ -11,7 +11,6 @@
 
 from flask import current_app as app
 from werkzeug.local import LocalProxy
-from werkzeug.security import safe_str_cmp
 
 from .signals import password_reset, reset_password_instructions_sent
 from .utils import send_mail, md5, encrypt_password, url_for_security, \
@@ -36,7 +35,8 @@ def send_reset_password_instructions(user):
               'reset_instructions',
               user=user, reset_link=reset_link)
 
-    reset_password_instructions_sent.send(app._get_current_object(), user=user, token=token)
+    reset_password_instructions_sent.send(app._get_current_object(),
+                                          user=user, token=token)
 
 
 def send_password_reset_notice(user):
@@ -54,8 +54,7 @@ def generate_reset_password_token(user):
 
     :param user: The user to work with
     """
-    password_hash = md5(user.password) if user.password else None
-    data = [str(user.id), password_hash]
+    data = [str(user.id), md5(user.password)]
     return _security.reset_serializer.dumps(data)
 
 
@@ -63,19 +62,11 @@ def reset_password_token_status(token):
     """Returns the expired status, invalid status, and user of a password reset
     token. For example::
 
-        expired, invalid, user, data = reset_password_token_status('...')
+        expired, invalid, user = reset_password_token_status('...')
 
     :param token: The password reset token
     """
-    expired, invalid, user, data = get_token_status(token, 'reset', 'RESET_PASSWORD',
-                                                    return_data=True)
-    if not invalid:
-        if user.password:
-            password_hash = md5(user.password)
-            if not safe_str_cmp(password_hash, data[1]):
-                invalid = True
-
-    return expired, invalid, user
+    return get_token_status(token, 'reset', 'RESET_PASSWORD')
 
 
 def update_password(user, password):

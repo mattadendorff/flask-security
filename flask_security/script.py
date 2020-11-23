@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    flask_security.script
-    ~~~~~~~~~~~~~~~~~~~~~
+    flask.ext.security.script
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
 
     Flask-Security script module
 
@@ -18,7 +18,7 @@ except ImportError:
 import re
 
 from flask import current_app
-from flask_script import Command, Option
+from flask.ext.script import Command, Option
 from werkzeug.local import LocalProxy
 
 from .utils import encrypt_password
@@ -100,7 +100,7 @@ class AddRoleCommand(_RoleCommand):
 
 
 class RemoveRoleCommand(_RoleCommand):
-    """Remove a role from a user"""
+    """Add a role to a user"""
 
     @commit
     def run(self, user_identifier, role_name):
@@ -115,7 +115,7 @@ class _ToggleActiveCommand(Command):
 
 
 class DeactivateUserCommand(_ToggleActiveCommand):
-    """Deactivate a user"""
+    """Deactive a user"""
 
     @commit
     def run(self, user_identifier):
@@ -124,7 +124,7 @@ class DeactivateUserCommand(_ToggleActiveCommand):
 
 
 class ActivateUserCommand(_ToggleActiveCommand):
-    """Activate a user"""
+    """Deactive a user"""
 
     @commit
     def run(self, user_identifier):

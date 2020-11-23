@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    flask_security.core
-    ~~~~~~~~~~~~~~~~~~~
+    flask.ext.security.core
+    ~~~~~~~~~~~~~~~~~~~~~~~
 
     Flask-Security core module
 
@@ -10,9 +10,9 @@
 """
 
 from flask import current_app, render_template
-from flask_login import AnonymousUserMixin, UserMixin as BaseUserMixin, \
+from flask.ext.login import AnonymousUserMixin, UserMixin as BaseUserMixin, \
     LoginManager, current_user
-from flask_principal import Principal, RoleNeed, UserNeed, Identity, \
+from flask.ext.principal import Principal, RoleNeed, UserNeed, Identity, \
     identity_loaded
 from itsdangerous import URLSafeTimedSerializer
 from passlib.context import CryptContext
@@ -75,7 +75,6 @@ _default_config = {
     'EMAIL_SENDER': 'no-reply@localhost',
     'TOKEN_AUTHENTICATION_KEY': 'auth_token',
     'TOKEN_AUTHENTICATION_HEADER': 'Authentication-Token',
-    'TOKEN_MAX_AGE': None,
     'CONFIRM_SALT': 'confirm-salt',
     'RESET_SALT': 'reset-salt',
     'LOGIN_SALT': 'login-salt',
@@ -193,17 +192,17 @@ def _user_loader(user_id):
 
 def _token_loader(token):
     try:
-        data = _security.remember_token_serializer.loads(token, max_age=_security.token_max_age)
+        data = _security.remember_token_serializer.loads(token)
         user = _security.datastore.find_user(id=data[0])
         if user and safe_str_cmp(md5(user.password), data[1]):
             return user
     except:
         pass
-    return _security.login_manager.anonymous_user()
+    return AnonymousUser()
 
 
 def _identity_loader():
-    if not isinstance(current_user._get_current_object(), AnonymousUserMixin):
+    if not isinstance(current_user._get_current_object(), AnonymousUser):
         identity = Identity(current_user.id)
         return identity
 
@@ -218,9 +217,9 @@ def _on_identity_loaded(sender, identity):
     identity.user = current_user
 
 
-def _get_login_manager(app, anonymous_user):
+def _get_login_manager(app):
     lm = LoginManager()
-    lm.anonymous_user = anonymous_user or AnonymousUser
+    lm.anonymous_user = AnonymousUser
     lm.login_view = '%s.login' % cv('BLUEPRINT_NAME', app=app)
     lm.user_loader(_user_loader)
     lm.token_loader(_token_loader)
@@ -258,14 +257,14 @@ def _get_serializer(app, name):
     return URLSafeTimedSerializer(secret_key=secret_key, salt=salt)
 
 
-def _get_state(app, datastore, anonymous_user=None, **kwargs):
+def _get_state(app, datastore, **kwargs):
     for key, value in get_config(app).items():
         kwargs[key.lower()] = value
 
     kwargs.update(dict(
         app=app,
         datastore=datastore,
-        login_manager=_get_login_manager(app, anonymous_user),
+        login_manager=_get_login_manager(app),
         principal=_get_principal(app),
         pwd_context=_get_pwd_context(app),
         remember_token_serializer=_get_serializer(app, 'remember'),
@@ -273,8 +272,7 @@ def _get_state(app, datastore, anonymous_user=None, **kwargs):
         reset_serializer=_get_serializer(app, 'reset'),
         confirm_serializer=_get_serializer(app, 'confirm'),
         _context_processors={},
-        _send_mail_task=None,
-        _unauthorized_callback=None
+        _send_mail_task=None
     ))
 
     for key, value in _default_forms.items():
@@ -305,7 +303,6 @@ class RoleMixin(object):
 class UserMixin(BaseUserMixin):
     """Mixin for `User` model definitions"""
 
-    @property
     def is_active(self):
         """Returns `True` if the user is active."""
         return self.active
@@ -383,9 +380,6 @@ class _SecurityState(object):
     def send_mail_task(self, fn):
         self._send_mail_task = fn
 
-    def unauthorized_handler(self, fn):
-        self._unauthorized_callback = fn
-
 
 class Security(object):
     """The :class:`Security` class initializes the Flask-Security extension.
@@ -404,8 +398,7 @@ class Security(object):
                  login_form=None, confirm_register_form=None,
                  register_form=None, forgot_password_form=None,
                  reset_password_form=None, change_password_form=None,
-                 send_confirmation_form=None, passwordless_login_form=None,
-                 anonymous_user=None):
+                 send_confirmation_form=None, passwordless_login_form=None):
         """Initializes the Flask-Security extension for the specified
         application and datastore implentation.
 
@@ -431,8 +424,7 @@ class Security(object):
                            reset_password_form=reset_password_form,
                            change_password_form=change_password_form,
                            send_confirmation_form=send_confirmation_form,
-                           passwordless_login_form=passwordless_login_form,
-                           anonymous_user=anonymous_user)
+                           passwordless_login_form=passwordless_login_form)
 
         if register_blueprint:
             app.register_blueprint(create_blueprint(state, __name__))

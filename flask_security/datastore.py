@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    flask_security.datastore
-    ~~~~~~~~~~~~~~~~~~~~~~~~
+    flask.ext.security.datastore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     This module contains an user datastore classes.
 
@@ -195,7 +195,7 @@ class SQLAlchemyUserDatastore(SQLAlchemyDatastore, UserDatastore):
     def _is_numeric(self, value):
         try:
             int(value)
-        except (TypeError, ValueError):
+        except ValueError:
             return False
         return True
 

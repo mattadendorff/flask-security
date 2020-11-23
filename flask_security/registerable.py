@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    flask_security.registerable
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    flask.ext.security.registerable
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     Flask-Security registerable module
 
